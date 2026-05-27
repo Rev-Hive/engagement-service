@@ -4,6 +4,8 @@ server:
 spring:
   application:
     name: engagement-service
+  profiles:
+    active: local
 
   datasource:
     # Database Configuration (H2 in-memory database by default for local testing)

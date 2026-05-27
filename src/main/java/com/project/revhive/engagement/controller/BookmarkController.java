@@ -14,7 +14,6 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/bookmarks")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*", maxAge = 3600)
 @Slf4j
 public class BookmarkController {
 
