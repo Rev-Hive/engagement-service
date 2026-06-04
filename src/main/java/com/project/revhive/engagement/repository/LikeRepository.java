@@ -16,4 +16,7 @@ public interface LikeRepository extends JpaRepository<Like, Long> {
     Optional<Like> findByUserIdAndPostId(Long userId, Long postId);
 
     void deleteByUserIdAndPostId(Long userId, Long postId);
+
+    @org.springframework.data.jpa.repository.Query("SELECT l.postId FROM Like l WHERE l.userId = :userId")
+    java.util.List<Long> findLikedPostIdsByUserId(@org.springframework.data.repository.query.Param("userId") Long userId);
 }

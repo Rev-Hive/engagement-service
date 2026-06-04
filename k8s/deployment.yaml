@@ -26,25 +26,15 @@ spec:
             - containerPort: 8085
 
           env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: docker
+
             - name: SPRING_DATASOURCE_URL
-              value: jdbc:mysql://mysql-db:3306/revhive_db
+              value: jdbc:mysql://mysql:3306/revhive_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
             - name: SPRING_DATASOURCE_USERNAME
-              value: root
+              value: sourav
             - name: SPRING_DATASOURCE_PASSWORD
-              value: 23@Tanushree
+              value: sourav@123
             - name: EUREKA_CLIENT_SERVICEURL_DEFAULTZONE
               value: http://service-registry:8761/eureka
 
-          livenessProbe:
-            httpGet:
-              path: /actuator/health
-              port: 8085
-            initialDelaySeconds: 30
-            periodSeconds: 10
-
-          readinessProbe:
-            httpGet:
-              path: /actuator/health
-              port: 8085
-            initialDelaySeconds: 15
-            periodSeconds: 5

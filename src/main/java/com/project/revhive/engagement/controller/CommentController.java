@@ -1,6 +1,7 @@
 package com.project.revhive.engagement.controller;
 
 import com.project.revhive.engagement.dto.CommentRequest;
+import com.project.revhive.engagement.dto.CommentResponse;
 import com.project.revhive.engagement.model.Comment;
 import com.project.revhive.engagement.service.CommentService;
 import jakarta.validation.Valid;
@@ -26,13 +27,24 @@ public class CommentController {
     private final CommentService commentService;
 
     @PostMapping
-    public ResponseEntity<Comment> addComment(@Valid @RequestBody CommentRequest request) {
+
+    public ResponseEntity<Comment> addComment(
+            @Valid @RequestBody CommentRequest request,
+            @RequestHeader(value = "X-Auth-UserId", required = false) String userIdHeader,
+            @RequestHeader(value = "X-Auth-User", required = false) String username) {
+
         log.info("POST /api/comments - Adding comment to post: {}", request.getPostId());
+
+        Long userId = userIdHeader != null ? Long.parseLong(userIdHeader) : 1L;
+
+        String resolvedUsername = (username != null && !username.isEmpty()) ? username : request.getUsername();
+
         Comment comment = commentService.addComment(
-                request.getUserId(),
                 request.getPostId(),
                 request.getContent(),
-                request.getParentId()
+                request.getParentId(),
+                resolvedUsername,
+                userId
         );
         return ResponseEntity.ok(comment);
     }
@@ -43,10 +55,11 @@ public class CommentController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
 
-        log.info("GET /api/comments/post/{} - Page: {}, Size: {}", postId, page, size);
+        Pageable pageable =
+                PageRequest.of(page, size, Sort.by("createdAt").descending());
 
-        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
-        Page<Comment> comments = commentService.getCommentsByPost(postId, pageable);
+        Page<Comment> comments =
+                commentService.getCommentsByPost(postId, pageable);
 
         return ResponseEntity.ok(comments);
     }

@@ -80,4 +80,10 @@ public class LikeController {
 
         return ResponseEntity.ok(response);
     }
+
+    @GetMapping("/user/{userId}/liked-posts")
+    public ResponseEntity<java.util.List<Long>> getLikedPostIds(@PathVariable Long userId) {
+        log.info("GET /api/likes/user/{}/liked-posts", userId);
+        return ResponseEntity.ok(likeService.getLikedPostIds(userId));
+    }
 }

@@ -7,6 +7,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.project.revhive.engagement.service.integration.NotificationIntegrationService;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -14,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class LikeService {
 
     private final LikeRepository likeRepository;
+    private final NotificationIntegrationService notificationIntegrationService;
 
     @Transactional
     public String addLike(Long userId, Long postId) {
@@ -28,6 +31,21 @@ public class LikeService {
 
         likeRepository.save(like);
         log.info("Post {} liked by user {}", postId, userId);
+
+        // Update post-service like count
+        try {
+            notificationIntegrationService.incrementPostLikeCount(postId);
+        } catch (Exception e) {
+            log.error("Failed to increment post like count in post-service: {}", e.getMessage());
+        }
+
+        // Trigger real-time notification
+        try {
+            notificationIntegrationService.sendLikeNotification(userId, postId);
+        } catch (Exception e) {
+            log.error("Failed to trigger like notification: {}", e.getMessage());
+        }
+
         return "Liked successfully";
     }
 
@@ -38,6 +56,14 @@ public class LikeService {
 
         likeRepository.delete(like);
         log.info("Post {} unliked by user {}", postId, userId);
+
+        // Update post-service like count
+        try {
+            notificationIntegrationService.decrementPostLikeCount(postId);
+        } catch (Exception e) {
+            log.error("Failed to decrement post like count in post-service: {}", e.getMessage());
+        }
+
         return "Unliked successfully";
     }
 
@@ -49,5 +75,10 @@ public class LikeService {
     @Transactional(readOnly = true)
     public boolean isLiked(Long userId, Long postId) {
         return likeRepository.existsByUserIdAndPostId(userId, postId);
+    }
+
+    @Transactional(readOnly = true)
+    public java.util.List<Long> getLikedPostIds(Long userId) {
+        return likeRepository.findLikedPostIdsByUserId(userId);
     }
 }

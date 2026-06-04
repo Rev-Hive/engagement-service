@@ -21,6 +21,7 @@ public class Comment {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "comment_id")
     private Long id;
 
     @Column(name = "post_id", nullable = false)
@@ -36,6 +37,10 @@ public class Comment {
     @JoinColumn(name = "parent_id")
     @JsonIgnore
     private Comment parent;
+
+
+    @Column(name="username")
+    private String username;
 
     @OneToMany(mappedBy = "parent", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @Builder.Default

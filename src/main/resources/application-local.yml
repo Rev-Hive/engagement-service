@@ -3,9 +3,9 @@ server:
 
 spring:
   datasource:
-    url: jdbc:mysql://localhost:3306/revhive_engagement_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
-    username: root
-    password: 23@Tanushree
+    url: jdbc:mysql://localhost:3306/revhive_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
+    username: sourav
+    password: sourav@123
     driver-class-name: com.mysql.cj.jdbc.Driver
 
   jpa:

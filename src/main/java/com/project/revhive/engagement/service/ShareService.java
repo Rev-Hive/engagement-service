@@ -9,6 +9,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
+import com.project.revhive.engagement.service.integration.NotificationIntegrationService;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -16,6 +18,7 @@ import java.util.List;
 public class ShareService {
 
     private final ShareRepository shareRepository;
+    private final NotificationIntegrationService notificationIntegrationService;
 
     @Transactional
     public String sharePost(Long userId, Long postId, String platform) {
@@ -27,6 +30,14 @@ public class ShareService {
 
         shareRepository.save(share);
         log.info("Post {} shared by user {} on platform {}", postId, userId, platform);
+
+        // Trigger real-time notification
+        try {
+            notificationIntegrationService.sendShareNotification(userId, postId);
+        } catch (Exception e) {
+            log.error("Failed to trigger share notification: {}", e.getMessage());
+        }
+
         return "Post shared successfully";
     }
 

@@ -1,0 +1,18 @@
+spring:
+  datasource:
+    url: jdbc:mysql://mysql:3306/revhive_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
+    username: sourav
+    password: sourav@123
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://service-registry:8761/eureka/
+
+app:
+  services:
+    user-service: http://user-service:8082
+    post-service: http://post-service:8087
+    notification-service: http://notification-service:8088
+
