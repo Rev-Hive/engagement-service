@@ -41,7 +41,19 @@ public class NotificationIntegrationService {
         this.notificationServiceUrl = notificationServiceUrl;
     }
 
-    // Helper to generate dynamic authorization headers propagating the active JWT token
+    private String getCorrelationId() {
+        try {
+            ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+            if (attributes != null) {
+                return attributes.getRequest().getHeader("X-Correlation-Id");
+            }
+        } catch (Exception ex) {
+            // ignore
+        }
+        return null;
+    }
+
+    // Helper to generate dynamic authorization headers propagating the active JWT token and correlation ID
     private HttpHeaders getHeaders() {
         HttpHeaders headers = new HttpHeaders();
         try {
@@ -51,15 +63,20 @@ public class NotificationIntegrationService {
                 if (authHeader != null && !authHeader.isEmpty()) {
                     headers.set("Authorization", authHeader);
                 }
+                String correlationId = attributes.getRequest().getHeader("X-Correlation-Id");
+                if (correlationId != null && !correlationId.isEmpty()) {
+                    headers.set("X-Correlation-Id", correlationId);
+                }
             }
         } catch (Exception ex) {
-            log.warn("Could not propagate JWT token inside engagement-service: {}", ex.getMessage());
+            log.warn("Could not propagate JWT token/CorrelationId inside engagement-service: {}", ex.getMessage());
         }
         return headers;
     }
 
     // Resolve post details with JWT token authorization propagated
     private PostDto getPost(Long postId) {
+        String correlationId = getCorrelationId();
         try {
             String url = postServiceUrl + "/api/posts/" + postId;
             HttpEntity<Void> entity = new HttpEntity<>(getHeaders());
@@ -74,13 +91,14 @@ public class NotificationIntegrationService {
                 return body.getData();
             }
         } catch (Exception e) {
-            log.warn("Failed to fetch post {} from post-service (URL: {}), falling back. Error: {}", postId, postServiceUrl, e.getMessage());
+            log.warn("[CorrelationId: {}] Failed to fetch post {} from post-service (URL: {}), falling back. Error: {}", correlationId, postId, postServiceUrl, e.getMessage());
         }
         return null;
     }
 
     // Resolve user's username with JWT token authorization propagated
     private String getUsername(Long userId) {
+        String correlationId = getCorrelationId();
         try {
             String url = userServiceUrl + "/api/users/" + userId;
             HttpEntity<Void> entity = new HttpEntity<>(getHeaders());
@@ -95,21 +113,47 @@ public class NotificationIntegrationService {
                 return profile.getUsername();
             }
         } catch (Exception e) {
-            log.warn("Failed to fetch username for user {} from user-service (URL: {}), falling back. Error: {}", userId, userServiceUrl, e.getMessage());
+            log.warn("[CorrelationId: {}] Failed to fetch username for user {} from user-service (URL: {}), falling back. Error: {}", correlationId, userId, userServiceUrl, e.getMessage());
         }
         return "Someone";
     }
 
-    // Helper to send a notification request to notification-service with JWT token authorization propagated
+    // Helper to send a notification request to notification-service with JWT token authorization propagated and retries
     private void send(NotificationRequest request) {
-        try {
-            String notifUrl = notificationServiceUrl + "/api/notifications";
-            HttpEntity<NotificationRequest> entity = new HttpEntity<>(request, getHeaders());
-            restTemplate.exchange(notifUrl, HttpMethod.POST, entity, Object.class);
-            log.info("Successfully sent notification to notification-service for user {}", request.getUserId());
-        } catch (Exception e) {
-            log.error("Failed to post notification to notification-service (URL: {}). Error: {}", notificationServiceUrl, e.getMessage());
+        String correlationId = getCorrelationId();
+        int maxRetries = 3;
+        int attempt = 0;
+        long backoffMs = 500;
+        Exception lastException = null;
+
+        while (attempt < maxRetries) {
+            try {
+                attempt++;
+                String notifUrl = notificationServiceUrl + "/api/notifications";
+                HttpEntity<NotificationRequest> entity = new HttpEntity<>(request, getHeaders());
+                restTemplate.exchange(notifUrl, HttpMethod.POST, entity, Object.class);
+                log.info("[CorrelationId: {}] Successfully sent notification to notification-service for user {} on attempt {}", 
+                        correlationId, request.getUserId(), attempt);
+                return; // success, return
+            } catch (Exception e) {
+                lastException = e;
+                log.warn("[CorrelationId: {}] Attempt {} to send notification to notification-service failed: {}", 
+                        correlationId, attempt, e.getMessage());
+                if (attempt < maxRetries) {
+                    try {
+                        Thread.sleep(backoffMs);
+                        backoffMs *= 2; // exponential backoff
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        log.error("[CorrelationId: {}] Notification retry backoff interrupted", correlationId);
+                        break;
+                    }
+                }
+            }
         }
+        log.error("[CorrelationId: {}] Failed to post notification to notification-service after {} attempts. Error: {}", 
+                correlationId, maxRetries, lastException.getMessage(), lastException);
+        throw new RuntimeException("Failed to deliver notification after retries", lastException);
     }
 
     // Truncate message contents to fit nicely in notifications

@@ -21,16 +21,23 @@ public class LikeService {
     @Transactional
     public String addLike(Long userId, Long postId) {
         if (likeRepository.existsByUserIdAndPostId(userId, postId)) {
+            log.info("Check exists: Post {} already liked by user {}", postId, userId);
             return "Already liked";
         }
 
-        Like like = Like.builder()
-                .userId(userId)
-                .postId(postId)
-                .build();
+        try {
+            Like like = Like.builder()
+                    .userId(userId)
+                    .postId(postId)
+                    .build();
 
-        likeRepository.save(like);
-        log.info("Post {} liked by user {}", postId, userId);
+            // Force immediate DB write to trigger unique constraint check before making external REST calls
+            likeRepository.saveAndFlush(like);
+            log.info("Post {} liked by user {} and flushed to DB", postId, userId);
+        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+            log.warn("Duplicate like detected via DB unique constraint for postId: {}, userId: {}", postId, userId);
+            throw new com.project.revhive.engagement.exception.DuplicateLikeException("Post already liked by user");
+        }
 
         // Update post-service like count
         try {
@@ -52,10 +59,12 @@ public class LikeService {
     @Transactional
     public String removeLike(Long userId, Long postId) {
         Like like = likeRepository.findByUserIdAndPostId(userId, postId)
-                .orElseThrow(() -> new RuntimeException("Like not found"));
+                .orElseThrow(() -> new com.project.revhive.engagement.exception.LikeNotFoundException("Like not found"));
 
         likeRepository.delete(like);
-        log.info("Post {} unliked by user {}", postId, userId);
+        // Force immediate DB write to verify deletion before making external REST calls
+        likeRepository.flush();
+        log.info("Post {} unliked by user {} and flushed to DB", postId, userId);
 
         // Update post-service like count
         try {
